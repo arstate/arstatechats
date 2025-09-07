@@ -1,0 +1,5 @@
+{
+  "name": "Arstate Chats",
+  "description": "A real-time online chat application powered by Firebase, with Google authentication and an integrated AI assistant using the Gemini API.",
+  "requestFramePermissions": []
+}
