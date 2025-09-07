@@ -1,5 +1,5 @@
 // IMPORTANT: Replace with your Google Client ID
-export const GOOGLE_CLIENT_ID = "485136857142-8rmrvpaq47j7t38uvnhonmt4ngkdre5q.apps.googleusercontent.com";
+export const GOOGLE_CLIENT_ID = "833864746763-8fr2dig39e6mtnuin4qql5en8r62ie4s.apps.googleusercontent.com";
 
 // IMPORTANT: You MUST replace the placeholder values below with your Firebase project's configuration.
 // You can find these details in your Firebase project settings. The app will not work otherwise.
