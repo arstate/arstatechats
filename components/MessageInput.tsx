@@ -89,45 +89,63 @@ export default function MessageInput({ currentUser, chatId }: MessageInputProps)
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     const messageText = input.trim();
-    if ((messageText === '' && !imageFile) || isSending || !chatId) return;
+    // Guard against sending empty messages or sending while another is in progress.
+    if ((!messageText && !imageFile) || isSending || !chatId) return;
 
     setIsSending(true);
-    setInput('');
-    const localImageFile = imageFile;
-    cancelImage();
 
     try {
-        if (localImageFile) {
-            const imageUrl = await uploadImage(chatId, localImageFile);
-            await sendMessage(chatId, currentUser, { text: messageText, imageUrl });
-        } else if (messageText) { // Text only
-            if (messageText.toLowerCase().startsWith('@assistant')) {
-                const prompt = messageText.substring(10).trim();
-                await sendMessage(chatId, currentUser, { text: messageText });
-                
-                dispatchAiStreamEvent('start');
-                let fullResponse = '';
-                await streamChatResponse(prompt, (chunk) => {
-                    fullResponse += chunk;
-                    dispatchAiStreamEvent('chunk', chunk);
-                });
-                
-                dispatchAiStreamEvent('end');
-                if (fullResponse.trim()) {
-                    const assistantUser: User = { ...ASSISTANT_USER, isGuest: true, usernameSet: true };
-                    await sendMessage(chatId, assistantUser, { text: fullResponse });
-                }
-            } else {
-                await sendMessage(chatId, currentUser, { text: messageText });
-            }
+      // Logic for messages containing an image (with or without text)
+      if (imageFile) {
+        const imageUrl = await uploadImage(chatId, imageFile);
+        await sendMessage(chatId, currentUser, { text: messageText, imageUrl });
+      } 
+      // Logic for text-only messages
+      else if (messageText) {
+        // AI Assistant command
+        if (messageText.toLowerCase().startsWith('@assistant')) {
+          const prompt = messageText.substring(10).trim();
+          await sendMessage(chatId, currentUser, { text: messageText });
+
+          // Clear the input after sending the prompt, so user sees it's sent.
+          setInput('');
+
+          // Dispatch events for the UI to show the AI is "thinking"
+          dispatchAiStreamEvent('start');
+          let fullResponse = '';
+          await streamChatResponse(prompt, (chunk) => {
+            fullResponse += chunk;
+            dispatchAiStreamEvent('chunk', chunk);
+          });
+          dispatchAiStreamEvent('end');
+
+          // Send the AI's response to the chat
+          if (fullResponse.trim()) {
+            const assistantUser: User = { ...ASSISTANT_USER, isGuest: true, usernameSet: true };
+            await sendMessage(chatId, assistantUser, { text: fullResponse });
+          }
+          
+          // The AI flow is complete, so we exit early.
+          setIsSending(false);
+          return;
+
+        } else {
+          // Standard text message
+          await sendMessage(chatId, currentUser, { text: messageText });
         }
+      }
+
+      // If we reach here, a non-AI message was sent successfully.
+      // Clear the inputs for the next message.
+      setInput('');
+      cancelImage();
+
     } catch (error) {
-        console.error("Error sending message:", error);
-        alert("Failed to send message. Please check your connection or configuration.");
-        // Restore input if sending failed
-        if (messageText) setInput(messageText);
+      console.error("Error sending message:", error);
+      alert("Failed to send message. Please check your connection or configuration.");
+      // On error, inputs are not cleared, allowing the user to retry sending.
     } finally {
-        setIsSending(false);
+      setIsSending(false);
     }
   };
 

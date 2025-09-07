@@ -94,7 +94,7 @@ export const updateUsername = async (userId: string, newName: string) => {
 };
 
 
-export const sendMessage = (chatId: string, user: User, content: { text?: string; imageUrl?: string }) => {
+export const sendMessage = async (chatId: string, user: User, content: { text?: string; imageUrl?: string }) => {
   if (!content.text?.trim() && !content.imageUrl) {
     console.error("Attempted to send an empty message.");
     return;
@@ -111,7 +111,9 @@ export const sendMessage = (chatId: string, user: User, content: { text?: string
     timestamp: serverTimestamp(),
     status: 'sent',
   };
-  return push(messagesRef, newMessage);
+  // The crucial change is making the function async and awaiting the database operation.
+  // This ensures that any errors during the push are propagated and can be caught.
+  await push(messagesRef, newMessage);
 };
 
 export const onMessagesSnapshot = (chatId: string, callback: (messages: Message[]) => void) => {
