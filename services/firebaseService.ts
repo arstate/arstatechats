@@ -4,16 +4,26 @@
 
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, push, onValue, off, serverTimestamp, get, query, orderByChild, equalTo, remove, update } from 'firebase/database';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { v4 as uuidv4 } from 'uuid';
 import { FIREBASE_CONFIG } from '../constants';
 import type { User, Message } from '../types';
 
 const app = initializeApp(FIREBASE_CONFIG);
 const db = getDatabase(app);
+const storage = getStorage(app);
 
 // Helper to create a consistent chat ID for two users
 export const getChatId = (uid1: string, uid2: string) => {
   return [uid1, uid2].sort().join('--');
+};
+
+export const uploadImage = async (chatId: string, file: File): Promise<string> => {
+    const filePath = `chat_images/${chatId}/${Date.now()}_${file.name}`;
+    const fileRef = storageRef(storage, filePath);
+    await uploadBytes(fileRef, file);
+    const downloadURL = await getDownloadURL(fileRef);
+    return downloadURL;
 };
 
 // Rewritten to fetch all users and filter client-side to avoid needing a DB index.
@@ -84,10 +94,15 @@ export const updateUsername = async (userId: string, newName: string) => {
 };
 
 
-export const sendMessage = (chatId: string, text: string, user: User) => {
+export const sendMessage = (chatId: string, user: User, content: { text?: string; imageUrl?: string }) => {
+  if (!content.text?.trim() && !content.imageUrl) {
+    console.error("Attempted to send an empty message.");
+    return;
+  }
+
   const messagesRef = ref(db, `messages/${chatId}`);
   const newMessage = {
-    text,
+    ...content,
     user: { // Store a smaller user object to save space
         id: user.id,
         name: user.name,

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useMemo, useState } from 'react';
 import { markMessagesAsRead } from '../services/firebaseService';
 import type { User, Message } from '../types';
@@ -46,8 +45,13 @@ const ChatMessage = ({ message, isCurrentUser }: { message: Message, isCurrentUs
         <div className={`flex items-start space-x-3 ${alignment}`}>
             {!isCurrentUser && <img src={message.user.avatar} alt={message.user.name} className="w-8 h-8 rounded-full" />}
             <div className={`flex flex-col max-w-xs md:max-w-md ${isCurrentUser ? 'items-end' : 'items-start'}`}>
-                <div className={`mt-1 px-3 py-2 text-sm ${bubbleColor} rounded-2xl ${borderRadius}`}>
-                    <p>{message.text}</p>
+                <div className={`text-sm ${bubbleColor} rounded-2xl ${borderRadius} overflow-hidden`}>
+                    {message.imageUrl && (
+                        <a href={message.imageUrl} target="_blank" rel="noopener noreferrer">
+                            <img src={message.imageUrl} alt="Sent content" className="w-full h-auto" />
+                        </a>
+                    )}
+                    {message.text && <p className={`px-3 ${message.imageUrl ? 'pt-2 pb-3' : 'py-2'}`}>{message.text}</p>}
                 </div>
                  <div className="flex items-center space-x-1 mt-1">
                     <span className="text-xs text-gray-400">{formatTimestamp(message.timestamp)}</span>

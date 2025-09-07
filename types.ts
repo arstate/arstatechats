@@ -9,7 +9,8 @@ export interface User {
 
 export interface Message {
   id: string;
-  text: string;
+  text?: string;
+  imageUrl?: string;
   timestamp: number;
   user: User;
   status: 'sent' | 'read';
