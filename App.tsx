@@ -50,7 +50,7 @@ export default function App() {
     logout();
   };
   
-  const handleUsernameUpdated = (updatedUser: User) => {
+  const handleUserUpdate = (updatedUser: User) => {
     login(updatedUser);
   };
 
@@ -61,7 +61,7 @@ export default function App() {
     
     // If user is from Google and hasn't set their username, force setup
     if (!user.usernameSet && !user.isGuest) {
-      return <UsernameSetupPage user={user} onUsernameUpdated={handleUsernameUpdated} />;
+      return <UsernameSetupPage user={user} onUsernameUpdated={handleUserUpdate} />;
     }
 
     if (chatPartner) {
@@ -79,6 +79,7 @@ export default function App() {
         currentUser={user}
         onSelectUser={setChatPartner}
         onLogout={handleLogout}
+        onUserUpdate={handleUserUpdate}
       />
     );
   };

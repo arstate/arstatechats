@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import Header from './Header';
-import { getUsers, findUserById, findUserByName, deleteUser } from '../services/firebaseService';
+import { getUsers, findUserById, findUserByName, deleteUser, isUsernameTaken, updateUsername } from '../services/firebaseService';
 import type { User } from '../types';
 
 interface UserListPageProps {
   currentUser: User;
   onSelectUser: (user: User) => void;
   onLogout: () => void;
+  onUserUpdate: (user: User) => void;
 }
 
 const UserListItem = ({ user, onSelect }: { user: User; onSelect: () => void; }) => (
@@ -22,11 +23,17 @@ const UserListItem = ({ user, onSelect }: { user: User; onSelect: () => void; })
     </li>
 );
 
-export default function UserListPage({ currentUser, onSelectUser, onLogout }: UserListPageProps) {
+export default function UserListPage({ currentUser, onSelectUser, onLogout, onUserUpdate }: UserListPageProps) {
     const [users, setUsers] = useState<User[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+
+    // State for editing profile
+    const [isEditing, setIsEditing] = useState(false);
+    const [newName, setNewName] = useState(currentUser.name);
+    const [editError, setEditError] = useState('');
+    const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
         const unsubscribe = getUsers(setUsers);
@@ -81,6 +88,48 @@ export default function UserListPage({ currentUser, onSelectUser, onLogout }: Us
             }
         }
     };
+
+    const handleEditToggle = () => {
+        setIsEditing(!isEditing);
+        setNewName(currentUser.name); // Reset on toggle/cancel
+        setEditError('');
+    };
+
+    const handleSaveName = async () => {
+        setEditError('');
+        const trimmedName = newName.trim();
+
+        if (trimmedName === currentUser.name) {
+            setIsEditing(false);
+            return;
+        }
+
+        if (trimmedName.length < 3) {
+            setEditError('Username must be at least 3 characters long.');
+            return;
+        }
+        if (!/^[a-zA-Z0-9_]+$/.test(trimmedName)) {
+            setEditError('Username can only contain letters, numbers, and underscores.');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const taken = await isUsernameTaken(trimmedName, currentUser.id);
+            if (taken) {
+                setEditError('This username is already taken.');
+            } else {
+                await updateUsername(currentUser.id, trimmedName);
+                onUserUpdate({ ...currentUser, name: trimmedName });
+                setIsEditing(false);
+            }
+        } catch (err) {
+            console.error('Error updating username:', err);
+            setEditError('An error occurred. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
+    };
     
     const filteredUsers = users.filter(user => user.id !== currentUser.id);
 
@@ -113,8 +162,46 @@ export default function UserListPage({ currentUser, onSelectUser, onLogout }: Us
                     
                     <div className="p-4 mb-4 bg-white rounded-lg shadow-sm border border-gray-200">
                         <h2 className="text-lg font-semibold mb-2 text-gray-700">Your Account</h2>
-                         <p className="text-sm text-gray-600">Your Name: <span className="font-semibold text-gray-800">{currentUser.name}</span></p>
-                         <p className="mt-1 text-xs text-gray-500">Your ID: <span className="font-mono bg-gray-200 px-1 rounded">{currentUser.id}</span></p>
+                         
+                        {isEditing ? (
+                            <div className="space-y-2">
+                                <label htmlFor="usernameEdit" className="text-sm text-gray-600 block">Edit Your Name:</label>
+                                <div className="flex space-x-2">
+                                    <input
+                                        id="usernameEdit"
+                                        type="text"
+                                        value={newName}
+                                        onChange={(e) => setNewName(e.target.value)}
+                                        className="flex-1 px-3 py-2 text-sm bg-gray-100 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        disabled={isSaving}
+                                    />
+                                    <button 
+                                        onClick={handleSaveName} 
+                                        disabled={isSaving || newName.trim() === ''}
+                                        className="px-4 py-2 text-sm font-semibold text-white bg-green-500 rounded-md disabled:bg-gray-300 hover:bg-green-600 transition-colors"
+                                    >
+                                        {isSaving ? '...' : 'Save'}
+                                    </button>
+                                    <button 
+                                        onClick={handleEditToggle} 
+                                        disabled={isSaving}
+                                        className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                                {editError && <p className="mt-2 text-xs text-red-500">{editError}</p>}
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm text-gray-600">Your Name: <span className="font-semibold text-gray-800">{currentUser.name}</span></p>
+                                <button onClick={handleEditToggle} className="px-3 py-1 text-xs font-semibold text-blue-700 bg-blue-100 rounded-full hover:bg-blue-200 transition-colors">
+                                    Edit Profile
+                                </button>
+                            </div>
+                        )}
+
+                         <p className="mt-2 text-xs text-gray-500">Your ID: <span className="font-mono bg-gray-200 px-1 rounded">{currentUser.id}</span></p>
                          <button onClick={handleDeleteAccount} className="mt-3 w-full px-4 py-2 text-sm font-semibold text-red-700 bg-red-100 rounded-md hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
                             Delete My Account
                          </button>

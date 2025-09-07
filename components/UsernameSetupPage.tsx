@@ -28,7 +28,7 @@ export default function UsernameSetupPage({ user, onUsernameUpdated }: UsernameS
 
     setIsLoading(true);
     try {
-      const taken = await isUsernameTaken(trimmedUsername);
+      const taken = await isUsernameTaken(trimmedUsername, user.id);
       if (taken) {
         setError('This username is already taken. Please choose another one.');
       } else {

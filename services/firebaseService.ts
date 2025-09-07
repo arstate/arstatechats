@@ -16,15 +16,24 @@ export const getChatId = (uid1: string, uid2: string) => {
   return [uid1, uid2].sort().join('--');
 };
 
+// Rewritten to fetch all users and filter client-side to avoid needing a DB index.
 export const findOrCreateUser = async (googleUser: { name?: string | null; picture?: string | null; sub: string }): Promise<User> => {
     const usersRef = ref(db, 'users');
-    const q = query(usersRef, orderByChild('googleId'), equalTo(googleUser.sub));
-    const snapshot = await get(q);
+    const snapshot = await get(usersRef);
+    let foundUser: (User & { id: string }) | null = null;
 
     if (snapshot.exists()) {
-        const userData = snapshot.val();
-        const userId = Object.keys(userData)[0];
-        return { id: userId, ...userData[userId], isGuest: false };
+        const users = snapshot.val();
+        for (const userId in users) {
+            if (users[userId].googleId === googleUser.sub) {
+                foundUser = { id: userId, ...users[userId], isGuest: false };
+                break;
+            }
+        }
+    }
+
+    if (foundUser) {
+        return foundUser;
     } else {
         const userId = uuidv4();
         const newUser: Omit<User, 'id' | 'isGuest'> & { googleId: string } = {
@@ -38,6 +47,7 @@ export const findOrCreateUser = async (googleUser: { name?: string | null; pictu
     }
 };
 
+
 export const createGuestUser = (): User => {
     const userId = uuidv4();
     return {
@@ -49,12 +59,24 @@ export const createGuestUser = (): User => {
     };
 };
 
-export const isUsernameTaken = async (username: string): Promise<boolean> => {
+// Rewritten to fetch all users and check client-side. This avoids needing a database index.
+// It's also case-insensitive and ignores the current user's own name.
+export const isUsernameTaken = async (username: string, currentUserId: string): Promise<boolean> => {
     const usersRef = ref(db, 'users');
-    const q = query(usersRef, orderByChild('name'), equalTo(username));
-    const snapshot = await get(q);
-    return snapshot.exists();
+    const snapshot = await get(usersRef);
+    if (snapshot.exists()) {
+        const users = snapshot.val();
+        const lowerCaseUsername = username.toLowerCase();
+        for (const userId in users) {
+            // If a user has the same name and it's not the current user, then it's taken.
+            if (users[userId].name?.toLowerCase() === lowerCaseUsername && userId !== currentUserId) {
+                return true;
+            }
+        }
+    }
+    return false; // Not taken
 };
+
 
 export const updateUsername = async (userId: string, newName: string) => {
     const userRef = ref(db, `users/${userId}`);
@@ -149,14 +171,19 @@ export const findUserById = async (userId: string): Promise<User | null> => {
     return null;
 };
 
+// Rewritten to fetch all users and search client-side to avoid needing a DB index.
+// Also makes the search case-insensitive.
 export const findUserByName = async (name: string): Promise<User | null> => {
     const usersRef = ref(db, 'users');
-    const q = query(usersRef, orderByChild('name'), equalTo(name));
-    const snapshot = await get(q);
+    const snapshot = await get(usersRef);
     if (snapshot.exists()) {
-        const userData = snapshot.val();
-        const userId = Object.keys(userData)[0];
-        return { id: userId, ...userData[userId], isGuest: false };
+        const users = snapshot.val();
+        const lowerCaseName = name.toLowerCase();
+        for (const userId in users) {
+            if (users[userId].name?.toLowerCase() === lowerCaseName) {
+                return { id: userId, ...users[userId], isGuest: false };
+            }
+        }
     }
     return null;
 };
