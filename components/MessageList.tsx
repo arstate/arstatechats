@@ -1,13 +1,27 @@
 
-import React, { useEffect, useState, useRef } from 'react';
-import { onMessagesSnapshot } from '../services/firebaseService';
+import React, { useEffect, useRef, useMemo, useState } from 'react';
+import { markMessagesAsRead } from '../services/firebaseService';
 import type { User, Message } from '../types';
 import { ASSISTANT_USER } from '../constants';
 
 interface MessageListProps {
   currentUser: User;
   chatId: string;
+  messages: Message[];
 }
+
+const SentIcon = () => <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>;
+const ReadIcon = () => <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7m-7 7l-4-4" /></svg>;
+
+const MessageStatus = ({ status }: { status: 'sent' | 'read' }) => {
+    if (status === 'read') return <ReadIcon />;
+    return <SentIcon />;
+};
+
+const formatTimestamp = (timestamp: number) => {
+    if (!timestamp) return '';
+    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
 
 const AIMessageStream = ({ text }: { text: string }) => {
     return (
@@ -27,15 +41,17 @@ const ChatMessage = ({ message, isCurrentUser }: { message: Message, isCurrentUs
     const alignment = isCurrentUser ? 'justify-end' : 'justify-start';
     const bubbleColor = isCurrentUser ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800';
     const borderRadius = isCurrentUser ? 'rounded-tr-none' : 'rounded-tl-none';
-    const nameColor = isCurrentUser ? 'text-blue-200' : 'text-gray-500';
 
     return (
         <div className={`flex items-start space-x-3 ${alignment}`}>
             {!isCurrentUser && <img src={message.user.avatar} alt={message.user.name} className="w-8 h-8 rounded-full" />}
-            <div className={`flex flex-col ${isCurrentUser ? 'items-end' : 'items-start'}`}>
-                <span className={`text-xs font-bold ${nameColor}`}>{message.user.name}</span>
-                <div className={`mt-1 px-4 py-2 text-sm ${bubbleColor} rounded-2xl ${borderRadius}`}>
+            <div className={`flex flex-col max-w-xs md:max-w-md ${isCurrentUser ? 'items-end' : 'items-start'}`}>
+                <div className={`mt-1 px-3 py-2 text-sm ${bubbleColor} rounded-2xl ${borderRadius}`}>
                     <p>{message.text}</p>
+                </div>
+                 <div className="flex items-center space-x-1 mt-1">
+                    <span className="text-xs text-gray-400">{formatTimestamp(message.timestamp)}</span>
+                    {isCurrentUser && <MessageStatus status={message.status} />}
                 </div>
             </div>
             {isCurrentUser && <img src={message.user.avatar} alt={message.user.name} className="w-8 h-8 rounded-full" />}
@@ -44,17 +60,19 @@ const ChatMessage = ({ message, isCurrentUser }: { message: Message, isCurrentUs
 };
 
 
-export default function MessageList({ currentUser, chatId }: MessageListProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
+export default function MessageList({ currentUser, chatId, messages }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
   const [aiStream, setAiStream] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!chatId) return;
-    const unsubscribe = onMessagesSnapshot(chatId, setMessages);
-    return () => unsubscribe();
-  }, [chatId]);
+    // Mark incoming messages as read
+    if (chatId && currentUser.id && messages.length > 0) {
+        const hasUnread = messages.some(m => m.user.id !== currentUser.id && m.status === 'sent');
+        if (hasUnread) {
+            markMessagesAsRead(chatId, currentUser.id);
+        }
+    }
+  }, [chatId, currentUser.id, messages]);
 
   useEffect(() => {
     const handleAiStream = ((event: CustomEvent) => {
@@ -76,7 +94,10 @@ export default function MessageList({ currentUser, chatId }: MessageListProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, aiStream]);
 
-  const sortedMessages = [...messages].sort((a, b) => a.timestamp - b.timestamp);
+  const sortedMessages = useMemo(() => 
+    [...messages].sort((a, b) => a.timestamp - b.timestamp),
+    [messages]
+  );
 
   return (
     <div className="p-4 space-y-4 overflow-y-auto h-full">

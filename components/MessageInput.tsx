@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { sendMessage } from '../services/firebaseService';
 import { streamChatResponse } from '../services/geminiService';
@@ -47,7 +48,8 @@ export default function MessageInput({ currentUser, chatId }: MessageInputProps)
       
       dispatchAiStreamEvent('end');
       if (fullResponse.trim()) {
-         const assistantUser: User = { ...ASSISTANT_USER, isGuest: true };
+         // FIX: Added usernameSet property to satisfy the User type.
+         const assistantUser: User = { ...ASSISTANT_USER, isGuest: true, usernameSet: true };
          await sendMessage(chatId, fullResponse, assistantUser);
       }
     } else {

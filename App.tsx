@@ -1,9 +1,9 @@
-
 import React, { useState, useCallback } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import LoginPage from './components/LoginPage';
 import ChatPage from './components/ChatPage';
 import UserListPage from './components/UserListPage';
+import UsernameSetupPage from './components/UsernameSetupPage';
 import { GOOGLE_CLIENT_ID } from './constants';
 import type { User } from './types';
 
@@ -32,7 +32,6 @@ const useUserStore = () => {
     try {
       window.localStorage.removeItem('arstate-user');
       setUser(null);
-    // FIX: Added curly braces to the catch block to fix syntax error. This resolves all reported errors.
     } catch (error) {
       console.error('Error removing from localStorage', error);
     }
@@ -51,10 +50,20 @@ export default function App() {
     logout();
   };
   
+  const handleUsernameUpdated = (updatedUser: User) => {
+    login(updatedUser);
+  };
+
   const renderContent = () => {
     if (!user) {
       return <LoginPage onLogin={login} />;
     }
+    
+    // If user is from Google and hasn't set their username, force setup
+    if (!user.usernameSet && !user.isGuest) {
+      return <UsernameSetupPage user={user} onUsernameUpdated={handleUsernameUpdated} />;
+    }
+
     if (chatPartner) {
       return (
         <ChatPage

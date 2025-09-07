@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
-import { saveUser, createGuestUser } from '../services/firebaseService';
+import { findOrCreateUser, createGuestUser } from '../services/firebaseService';
 import type { User } from '../types';
 
 interface LoginPageProps {
@@ -30,21 +29,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const handleGoogleSuccess = async (credentialResponse: CredentialResponse) => {
     if (credentialResponse.credential) {
       const decoded: { name?: string; picture?: string; sub: string } = jwtDecode(credentialResponse.credential);
-      // For Google AI Studio preview, we might not have a real Firebase backend.
-      // So we can check for an empty config. In a real app, you'd handle this more robustly.
       try {
-        const user = await saveUser(decoded);
+        const user = await findOrCreateUser(decoded);
         onLogin(user);
       } catch (error) {
-        console.error("Firebase might not be configured. Using local user.", error);
-        // Fallback for preview environments without backend
-        const fallbackUser: User = { 
-            id: decoded.sub, 
-            name: decoded.name || "Google User", 
-            avatar: decoded.picture || `https://picsum.photos/seed/${decoded.sub}/40/40`,
-            isGuest: false
-        };
-        onLogin(fallbackUser);
+        console.error("Firebase error during login:", error);
+        alert("Could not log in. Please check your connection or Firebase configuration.");
       }
     }
   };
